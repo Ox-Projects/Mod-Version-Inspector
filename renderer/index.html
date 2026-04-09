@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mod Version Inspector</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="window-bar">
+        <div class="window-drag-region"></div>
+        <div class="window-controls">
+          <button id="minimizeButton" class="window-button" type="button" aria-label="Minimiser">
+            <span></span>
+          </button>
+          <button id="maximizeButton" class="window-button" type="button" aria-label="Agrandir ou restaurer">
+            <span class="maximize-icon"></span>
+          </button>
+          <button id="closeButton" class="window-button danger" type="button" aria-label="Fermer">
+            <span class="close-icon"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="window-content">
+        <main class="content-grid">
+          <section id="dropZone" class="drop-zone" aria-label="Zone de depot de mod">
+            <div class="drop-zone-inner">
+              <button id="browseButton" class="drop-badge drop-badge-button" type="button">Drag & Drop</button>
+              <h2>Dépose ton mod ici</h2>
+              <p>ou clique sur le badge pour l'ouvrir depuis l'explorateur Windows</p>
+              <div id="statusMessage" class="status-message">Aucun fichier chargé pour l'instant.</div>
+            </div>
+          </section>
+
+          <section class="results-panel">
+            <div class="panel-header">
+              <h2>Résultats</h2>
+              <span id="resultTag" class="result-tag">En attente</span>
+            </div>
+
+            <div class="cards-grid">
+              <article class="info-card accent-card">
+                <p class="label">Mod</p>
+                <h3 id="modName">Aucun mod chargé</h3>
+                <p id="modFile" class="muted">Importe un fichier Java pour commencer.</p>
+              </article>
+
+              <article class="info-card">
+                <p class="label">Version Java détectée</p>
+                <h3 id="javaVersion">-</h3>
+                <p id="javaDetails" class="muted">Le bytecode sera analysé classe par classe.</p>
+              </article>
+
+              <article class="info-card">
+                <p class="label">Jeu / Mod Loader</p>
+                <h3 id="loaderType">-</h3>
+                <p id="gameVersion" class="muted">Version du jeu non détectée.</p>
+              </article>
+
+              <article class="info-card">
+                <p class="label">Version du mod</p>
+                <h3 id="modVersion">-</h3>
+                <p id="manifestVersion" class="muted">Aucune métadonnée lue.</p>
+              </article>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-card">
+                <p class="label">Informations fichier</p>
+                <dl id="fileDetails" class="detail-list"></dl>
+              </div>
+
+              <div class="detail-card">
+                <p class="label">Métadonnées</p>
+                <dl id="manifestDetails" class="detail-list"></dl>
+              </div>
+            </div>
+
+            <div class="migration-section">
+              <div class="migration-card">
+                <div class="migration-header">
+                  <div>
+                    <p class="label">Mode Migration</p>
+                    <h3>Préparer un plan de portage</h3>
+                  </div>
+                  <div class="migration-actions">
+                    <button id="convertButton" class="plan-button convert-button" type="button">Convertir</button>
+                    <button id="planButton" class="plan-button" type="button">Générer le plan</button>
+                    <button id="workspaceButton" class="plan-button secondary" type="button">Créer le workspace</button>
+                    <button id="decompileButton" class="plan-button secondary" type="button">Préparer la décompilation</button>
+                    <button id="patchButton" class="plan-button secondary" type="button">Appliquer les patchs</button>
+                    <button id="buildStagesButton" class="plan-button secondary" type="button">Lancer les builds</button>
+                  </div>
+                </div>
+
+                <div class="migration-controls">
+                  <label class="control-field">
+                    <span>Loader cible</span>
+                    <select id="targetLoader"></select>
+                  </label>
+
+                  <label class="control-field">
+                    <span>Version du jeu cible</span>
+                    <select id="targetGameVersion"></select>
+                  </label>
+
+                  <label class="control-field">
+                    <span>Java cible</span>
+                    <select id="targetJavaVersion"></select>
+                  </label>
+                </div>
+
+                <div id="migrationStatus" class="migration-status">
+                  Charge un mod pour générer un chemin de migration en escalier.
+                </div>
+
+                <div id="conversionStatus" class="migration-status subtle">
+                  Aucune conversion automatique lancée pour l'instant.
+                </div>
+
+                <div id="workspaceStatus" class="migration-status subtle">
+                  Aucun workspace généré pour l'instant.
+                </div>
+
+                <div class="quick-actions">
+                  <button id="openWorkspaceButton" class="plan-button secondary" type="button">Ouvrir le workspace</button>
+                  <button id="openOutputButton" class="plan-button secondary" type="button">Ouvrir la sortie</button>
+                  <button id="openWorkspaceGuideButton" class="plan-button secondary" type="button">Ouvrir le guide</button>
+                  <button id="initWorkspaceButton" class="plan-button secondary" type="button">Init workspace</button>
+                  <button id="buildWorkspaceButton" class="plan-button secondary" type="button">Build workspace</button>
+                </div>
+
+                <div id="decompileStatus" class="migration-status subtle">
+                  Aucune décompilation préparée pour l'instant.
+                </div>
+
+                <div id="patchStatus" class="migration-status subtle">
+                  Aucun patch automatique appliqué pour l'instant.
+                </div>
+
+                <div id="buildStatus" class="migration-status subtle">
+                  Aucun build lancé pour l'instant.
+                </div>
+
+                <div class="report-block benchmark-block">
+                  <p class="label">Benchmark</p>
+                  <div class="quick-actions">
+                    <button id="pickBenchmarkFolderButton" class="plan-button secondary" type="button">Choisir un dossier</button>
+                    <button id="runBenchmarkButton" class="plan-button secondary" type="button">Lancer le benchmark</button>
+                    <button id="openBenchmarkReportButton" class="plan-button secondary" type="button">Ouvrir le rapport</button>
+                  </div>
+                  <p id="benchmarkStatus" class="report-copy">Aucun benchmark lancé pour l'instant.</p>
+                  <p id="benchmarkFolder" class="report-copy muted">Aucun dossier sélectionné.</p>
+                  <p id="benchmarkSummary" class="report-copy">Aucun résultat de benchmark.</p>
+                </div>
+
+                <div id="migrationReport" class="migration-report">
+                  <div class="report-block">
+                    <p class="label">Stratégie</p>
+                    <p id="migrationStrategy" class="report-copy">Aucun plan généré.</p>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Base de connaissances</p>
+                    <ul id="migrationKnowledge" class="report-list"></ul>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Escalier de versions</p>
+                    <div id="migrationSteps" class="chip-row"></div>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Risques</p>
+                    <ul id="migrationRisks" class="report-list"></ul>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Actions manuelles</p>
+                    <ul id="migrationTasks" class="report-list"></ul>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Phases</p>
+                    <div id="migrationPhases" class="phase-list"></div>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Build des stages</p>
+                    <p id="buildSummary" class="report-copy">Aucun build exécuté.</p>
+                    <div id="buildResults" class="phase-list"></div>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Patchs automatiques</p>
+                    <p id="patchSummary" class="report-copy">Aucun patch automatique appliqué.</p>
+                    <div id="patchResults" class="phase-list"></div>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Conversion</p>
+                    <p id="conversionSummary" class="report-copy">Aucune conversion automatique lancée.</p>
+                    <ul id="conversionSteps" class="report-list"></ul>
+                  </div>
+
+                  <div class="report-block">
+                    <p class="label">Logs Workspace</p>
+                    <p id="workspaceScriptSummary" class="report-copy">Aucun script global exécuté.</p>
+                    <pre id="workspaceScriptLogs" class="script-logs">Aucune sortie à afficher.</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
