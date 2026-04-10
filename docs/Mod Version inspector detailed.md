@@ -1,554 +1,258 @@
-\# Mod Version Inspector — Architecture détaillée
+# Mod Version Inspector — Architecture détaillée
 
-
-
-\## Vue d'ensemble des modules
-
-
+## 1. Vue d'ensemble des modules
 
 ```mermaid
-
 graph TD
+    MAIN["main.js - Electron Main Process"]
+    PRELOAD["preload.js - contextBridge"]
 
-&#x20;   MAIN\["main.js\\nElectron Main Process"]
+    MAIN -->|IPC handlers| PRELOAD
 
-&#x20;   PRELOAD\["preload.js\\ncontextBridge → window.modInspector"]
+    subgraph SRC["src/ - Modules metier"]
+        ANALYZER["analyzer.js - inspectArtifact()"]
+        PLANNER["migration-planner.js - planMigration()"]
+        WORKSPACE["workspace-generator.js - createMigrationWorkspace()"]
+        ORCHESTRATOR["conversion-orchestrator.js - convertArtifact()"]
+        PATCHER["auto-patcher.js - applyAutomaticPatches()"]
+        DECOMPILER["decompiler-manager.js - prepareDecompilation()"]
+        BUILD_DIAG["build-diagnostics.js - runWorkspaceBuilds()"]
+        BATCH["batch-benchmark.js - runBenchmark()"]
+        STAGE_SYNC["stage-sync.js - injectDecompiledSources()"]
+        KB["knowledge-base.js - buildKnowledgeContext()"]
+        MAPPING["mapping-profiles.js - resolveMappingProfile()"]
+        TOOLCHAIN["toolchain-profiles.js - resolveToolchainProfile()"]
+        HINTS["migration-hints.js - buildHints()"]
+        VERSION["version-rules.js - compareVersions()"]
+    end
 
-
-
-&#x20;   MAIN -->|IPC handlers| PRELOAD
-
-
-
-&#x20;   subgraph SRC\["src/ — Modules métier"]
-
-&#x20;       ANALYZER\["analyzer.js\\ninspectArtifact()"]
-
-&#x20;       PLANNER\["migration-planner.js\\nplanMigration()"]
-
-&#x20;       WORKSPACE\["workspace-generator.js\\ncreateMigrationWorkspace()"]
-
-&#x20;       ORCHESTRATOR\["conversion-orchestrator.js\\nconvertArtifact()"]
-
-&#x20;       PATCHER\["auto-patcher.js\\napplyAutomaticPatches()"]
-
-&#x20;       DECOMPILER\["decompiler-manager.js\\nprepareDecompilation()"]
-
-&#x20;       BUILD\_DIAG\["build-diagnostics.js\\nrunWorkspaceBuilds()"]
-
-&#x20;       BATCH\["batch-benchmark.js\\nrunBenchmark()"]
-
-&#x20;       STAGE\_SYNC\["stage-sync.js\\ninjectDecompiledSources()"]
-
-&#x20;       KB\["knowledge-base.js\\nbuildKnowledgeContext()"]
-
-&#x20;       MAPPING\["mapping-profiles.js\\nresolveMappingProfile()"]
-
-&#x20;       TOOLCHAIN\["toolchain-profiles.js\\nresolveToolchainProfile()"]
-
-&#x20;       HINTS\["migration-hints.js\\nbuildHints()"]
-
-&#x20;       VERSION\["version-rules.js\\ncompareVersions()\\ncollectVersionDiagnostics()"]
-
-&#x20;   end
-
-
-
-&#x20;   MAIN --> ANALYZER
-
-&#x20;   MAIN --> PLANNER
-
-&#x20;   MAIN --> WORKSPACE
-
-&#x20;   MAIN --> ORCHESTRATOR
-
-&#x20;   MAIN --> PATCHER
-
-&#x20;   MAIN --> DECOMPILER
-
-&#x20;   MAIN --> BUILD\_DIAG
-
-&#x20;   MAIN --> BATCH
-
+    MAIN --> ANALYZER
+    MAIN --> PLANNER
+    MAIN --> WORKSPACE
+    MAIN --> ORCHESTRATOR
+    MAIN --> PATCHER
+    MAIN --> DECOMPILER
+    MAIN --> BUILD_DIAG
+    MAIN --> BATCH
 ```
 
-
-
-\---
-
-
-
-\## Pipeline de conversion complet
-
-
+## 2. Pipeline de conversion
 
 ```mermaid
-
 flowchart TD
-
-&#x20;   INPUT\["Artefact\\n.jar / .zip / .class / .litemod"]
-
-
-
-&#x20;   subgraph INSPECT\["1 — Analyse (analyzer.js)"]
-
-&#x20;       A1\["Lecture bytecode .class\\n→ version Java"]
-
-&#x20;       A2\["Parsing mods.toml\\nfabric.mod.json\\nquilt.mod.json\\nplugin.yml\\nMANIFEST.MF"]
-
-&#x20;       A3\["Détection loader\\net game version"]
-
-&#x20;       A4\["Heuristique MCreator\\n(structure ModElements)"]
-
-&#x20;       A1 --> A3
-
-&#x20;       A2 --> A3
-
-&#x20;       A3 --> A4
-
-&#x20;   end
-
-
-
-&#x20;   subgraph PLAN\["2 — Planification (migration-planner.js)"]
-
-&#x20;       P1\["Calcul du staircase\\npar loader track"]
-
-&#x20;       P2\["Génération des phases\\n(previousVersion → gameVersion)"]
-
-&#x20;       P3\["Risques \& tâches manuelles"]
-
-&#x20;       P4\["buildKnowledgeContext()\\n(knowledge-base.js)"]
-
-&#x20;       P1 --> P2 --> P3
-
-&#x20;       P2 --> P4
-
-&#x20;   end
-
-
-
-&#x20;   subgraph WORKSPACE\_GEN\["3 — Workspace (workspace-generator.js)"]
-
-&#x20;       W1\["createStageScaffold()\\n1 dossier par palier"]
-
-&#x20;       W2\["build.gradle\\nsettings.gradle\\ngradle.properties"]
-
-&#x20;       W3\["Metadata loader\\nmods.toml / fabric.mod.json\\nquilt.mod.json / plugin.yml"]
-
-&#x20;       W4\["toolchain-profile.json\\n(toolchain-profiles.js)"]
-
-&#x20;       W5\["mapping-profile.json\\n(mapping-profiles.js)"]
-
-&#x20;       W6\["Scripts globaux\\ninit-workspace.ps1\\nbuild-workspace.ps1\\nworkspace-guide.md"]
-
-&#x20;       W7\["Scripts par stage\\ninit-stage.ps1\\ntoolchain-guide.md"]
-
-&#x20;       W1 --> W2
-
-&#x20;       W1 --> W3
-
-&#x20;       W1 --> W4
-
-&#x20;       W1 --> W5
-
-&#x20;       W1 --> W6
-
-&#x20;       W1 --> W7
-
-&#x20;   end
-
-
-
-&#x20;   subgraph DECOMP\["4 — Décompilation (decompiler-manager.js)"]
-
-&#x20;       D1\["Détection Java runtime"]
-
-&#x20;       D2\["Téléchargement CFR\\n(cfr-0.152.jar)"]
-
-&#x20;       D3\["Exécution CFR\\n→ sources .java"]
-
-&#x20;       D4\["injectDecompiledSources()\\n(stage-sync.js)\\n→ src/imported/java"]
-
-&#x20;       D1 --> D2 --> D3 --> D4
-
-&#x20;   end
-
-
-
-&#x20;   subgraph PATCH\["5 — Patchs automatiques (auto-patcher.js)"]
-
-&#x20;       PA1\["applyForgeSourceTransforms()\\nIBlockState, TileEntity,\\n@Mod.EventHandler…"]
-
-&#x20;       PA2\["applyFabricSourceTransforms()\\nRegistry, ModInitializer…"]
-
-&#x20;       PA3\["applyMcreatorSourceTransforms()\\nstructure ModElements"]
-
-&#x20;       PA4\["collectSourceDiagnostics()\\n+ version-rules.js"]
-
-&#x20;       PA5\["collectVersionDiagnostics()\\npatterns par loader/version"]
-
-&#x20;       PA4 --> PA5
-
-&#x20;       PA1 \& PA2 \& PA3 --> PA4
-
-&#x20;   end
-
-
-
-&#x20;   subgraph BUILD\["6 — Build (build-diagnostics.js)"]
-
-&#x20;       B1\["build-stage.ps1\\n(gradlew.bat ou gradle)"]
-
-&#x20;       B2\["parseBuildIssues()\\ncompiler / gradle / generic"]
-
-&#x20;       B3\["build-result.json\\nbuild-output.log"]
-
-&#x20;       B1 --> B2 --> B3
-
-&#x20;   end
-
-
-
-&#x20;   OUTPUT\["Artefact final .jar\\n+ rapports + workspace"]
-
-
-
-&#x20;   INPUT --> INSPECT
-
-&#x20;   INSPECT --> PLAN
-
-&#x20;   PLAN --> WORKSPACE\_GEN
-
-&#x20;   WORKSPACE\_GEN --> DECOMP
-
-&#x20;   DECOMP --> PATCH
-
-&#x20;   PATCH --> BUILD
-
-&#x20;   BUILD --> OUTPUT
-
+    INPUT["Artefact .jar / .zip / .class / .litemod"]
+
+    subgraph INSPECT["1 - Analyse analyzer.js"]
+        A1["Lecture bytecode .class -> version Java"]
+        A2["Parsing mods.toml / fabric.mod.json / plugin.yml / MANIFEST.MF"]
+        A3["Detection loader et game version"]
+        A4["Heuristique MCreator structure ModElements"]
+        A1 --> A3
+        A2 --> A3
+        A3 --> A4
+    end
+
+    subgraph PLAN["2 - Planification migration-planner.js"]
+        P1["Calcul du staircase par loader track"]
+        P2["Generation des phases previousVersion -> gameVersion"]
+        P3["Risques et taches manuelles"]
+        P4["buildKnowledgeContext() knowledge-base.js"]
+        P1 --> P2 --> P3
+        P2 --> P4
+    end
+
+    subgraph WORKSPACE_GEN["3 - Workspace workspace-generator.js"]
+        W1["createStageScaffold() - 1 dossier par palier"]
+        W2["build.gradle / settings.gradle / gradle.properties"]
+        W3["Metadata loader mods.toml / fabric.mod.json / quilt.mod.json / plugin.yml"]
+        W4["toolchain-profile.json via toolchain-profiles.js"]
+        W5["mapping-profile.json via mapping-profiles.js"]
+        W6["Scripts globaux init-workspace.ps1 / build-workspace.ps1 / workspace-guide.md"]
+        W7["Scripts par stage init-stage.ps1 / toolchain-guide.md"]
+        W1 --> W2
+        W1 --> W3
+        W1 --> W4
+        W1 --> W5
+        W1 --> W6
+        W1 --> W7
+    end
+
+    subgraph DECOMP["4 - Decompilation decompiler-manager.js"]
+        D1["Detection Java runtime"]
+        D2["Download CFR cfr-0.152.jar"]
+        D3["Execution CFR -> sources .java"]
+        D4["injectDecompiledSources() stage-sync.js -> src/imported/java"]
+        D1 --> D2 --> D3 --> D4
+    end
+
+    subgraph PATCH["5 - Patchs automatiques auto-patcher.js"]
+        PA1["applyForgeSourceTransforms() IBlockState TileEntity @Mod.EventHandler"]
+        PA2["applyFabricSourceTransforms() Registry ModInitializer"]
+        PA3["applyMcreatorSourceTransforms() structure ModElements"]
+        PA4["collectSourceDiagnostics() + version-rules.js"]
+        PA5["collectVersionDiagnostics() patterns par loader/version"]
+        PA1 & PA2 & PA3 --> PA4
+        PA4 --> PA5
+    end
+
+    subgraph BUILD["6 - Build build-diagnostics.js"]
+        B1["build-stage.ps1 gradlew.bat ou gradle"]
+        B2["parseBuildIssues() compiler / gradle / generic"]
+        B3["build-result.json / build-output.log"]
+        B1 --> B2 --> B3
+    end
+
+    OUTPUT["Artefact final .jar + rapports + workspace"]
+
+    INPUT --> INSPECT --> PLAN --> WORKSPACE_GEN --> DECOMP --> PATCH --> BUILD --> OUTPUT
 ```
 
-
-
-\---
-
-
-
-\## Dépendances entre modules
-
-
+## 3. Dependances entre modules
 
 ```mermaid
-
 graph LR
+    ORCHESTRATOR["conversion-orchestrator.js"]
+    PLANNER["migration-planner.js"]
+    WORKSPACE["workspace-generator.js"]
+    DECOMPILER["decompiler-manager.js"]
+    PATCHER["auto-patcher.js"]
+    BUILD["build-diagnostics.js"]
+    STAGE_SYNC["stage-sync.js"]
+    KB["knowledge-base.js"]
+    MAPPING["mapping-profiles.js"]
+    TOOLCHAIN["toolchain-profiles.js"]
+    HINTS["migration-hints.js"]
+    VERSION["version-rules.js"]
+    BATCH["batch-benchmark.js"]
+    ANALYZER["analyzer.js"]
 
-&#x20;   ORCHESTRATOR\["conversion-orchestrator.js"]
+    ORCHESTRATOR --> PLANNER
+    ORCHESTRATOR --> WORKSPACE
+    ORCHESTRATOR --> DECOMPILER
+    ORCHESTRATOR --> PATCHER
+    ORCHESTRATOR --> BUILD
 
-&#x20;   PLANNER\["migration-planner.js"]
+    PLANNER --> KB
+    PLANNER --> VERSION
+    KB --> VERSION
 
-&#x20;   WORKSPACE\["workspace-generator.js"]
+    WORKSPACE --> TOOLCHAIN
+    WORKSPACE --> MAPPING
+    WORKSPACE --> HINTS
 
-&#x20;   DECOMPILER\["decompiler-manager.js"]
+    TOOLCHAIN --> VERSION
+    MAPPING --> VERSION
+    HINTS -.->|buildHints| PLANNER
 
-&#x20;   PATCHER\["auto-patcher.js"]
+    DECOMPILER --> STAGE_SYNC
+    PATCHER --> VERSION
 
-&#x20;   BUILD\["build-diagnostics.js"]
-
-&#x20;   STAGE\_SYNC\["stage-sync.js"]
-
-&#x20;   KB\["knowledge-base.js"]
-
-&#x20;   MAPPING\["mapping-profiles.js"]
-
-&#x20;   TOOLCHAIN\["toolchain-profiles.js"]
-
-&#x20;   HINTS\["migration-hints.js"]
-
-&#x20;   VERSION\["version-rules.js"]
-
-&#x20;   BATCH\["batch-benchmark.js"]
-
-&#x20;   ANALYZER\["analyzer.js"]
-
-
-
-&#x20;   ORCHESTRATOR --> PLANNER
-
-&#x20;   ORCHESTRATOR --> WORKSPACE
-
-&#x20;   ORCHESTRATOR --> DECOMPILER
-
-&#x20;   ORCHESTRATOR --> PATCHER
-
-&#x20;   ORCHESTRATOR --> BUILD
-
-
-
-&#x20;   PLANNER --> KB
-
-&#x20;   PLANNER --> VERSION
-
-
-
-&#x20;   KB --> VERSION
-
-
-
-&#x20;   WORKSPACE --> TOOLCHAIN
-
-&#x20;   WORKSPACE --> MAPPING
-
-&#x20;   WORKSPACE --> HINTS
-
-
-
-&#x20;   TOOLCHAIN --> VERSION
-
-&#x20;   MAPPING --> VERSION
-
-&#x20;   HINTS -.->|buildHints| PLANNER
-
-
-
-&#x20;   DECOMPILER --> STAGE\_SYNC
-
-
-
-&#x20;   PATCHER --> VERSION
-
-
-
-&#x20;   BATCH --> ANALYZER
-
-&#x20;   BATCH --> ORCHESTRATOR
-
+    BATCH --> ANALYZER
+    BATCH --> ORCHESTRATOR
 ```
 
-
-
-\---
-
-
-
-\## Loader tracks et staircase
-
-
+## 4. Loader tracks et staircase
 
 ```mermaid
-
 flowchart LR
+    subgraph FORGE["Forge"]
+        F1["1.7.10"] --> F2["1.12.2"] --> F3["1.16.5"] --> F4["1.18.2"] --> F5["1.20.1"]
+    end
 
-&#x20;   subgraph FORGE\["Forge"]
+    subgraph FABRIC["Fabric"]
+        FA1["1.14.4"] --> FA2["1.16.5"] --> FA3["1.18.2"] --> FA4["1.20.1"] --> FA5["1.21.1"]
+    end
 
-&#x20;       F1\["1.7.10"] --> F2\["1.12.2"] --> F3\["1.16.5"] --> F4\["1.18.2"] --> F5\["1.20.1"]
+    subgraph QUILT["Quilt"]
+        Q1["1.18.2"] --> Q2["1.19.4"] --> Q3["1.20.1"] --> Q4["1.21.1"]
+    end
 
-&#x20;   end
+    subgraph BUKKIT["Bukkit / Paper"]
+        BK1["1.8.8"] --> BK2["1.12.2"] --> BK3["1.16.5"] --> BK4["1.20.1"] --> BK5["1.21.1"]
+    end
 
+    subgraph LITELOADER["LiteLoader"]
+        L1["1.7.10"] --> L2["1.8.9"] --> L3["1.12.2"]
+    end
 
-
-&#x20;   subgraph FABRIC\["Fabric"]
-
-&#x20;       FA1\["1.14.4"] --> FA2\["1.16.5"] --> FA3\["1.18.2"] --> FA4\["1.20.1"] --> FA5\["1.21.1"]
-
-&#x20;   end
-
-
-
-&#x20;   subgraph QUILT\["Quilt"]
-
-&#x20;       Q1\["1.18.2"] --> Q2\["1.19.4"] --> Q3\["1.20.1"] --> Q4\["1.21.1"]
-
-&#x20;   end
-
-
-
-&#x20;   subgraph BUKKIT\["Bukkit / Paper"]
-
-&#x20;       BK1\["1.8.8"] --> BK2\["1.12.2"] --> BK3\["1.16.5"] --> BK4\["1.20.1"] --> BK5\["1.21.1"]
-
-&#x20;   end
-
-
-
-&#x20;   subgraph LITELOADER\["LiteLoader"]
-
-&#x20;       L1\["1.7.10"] --> L2\["1.8.9"] --> L3\["1.12.2"]
-
-&#x20;   end
-
-
-
-&#x20;   subgraph JAVA\["Java requis"]
-
-&#x20;       J1\["≥ 1.21 → Java 21"]
-
-&#x20;       J2\["≥ 1.18 → Java 17"]
-
-&#x20;       J3\["= 1.17 → Java 16"]
-
-&#x20;       J4\["≥ 1.13 → Java 8"]
-
-&#x20;   end
-
+    subgraph JAVA["Java requis par version"]
+        J1["1.21+ -> Java 21"]
+        J2["1.18+ -> Java 17"]
+        J3["1.17 -> Java 16"]
+        J4["1.13+ -> Java 8"]
+    end
 ```
 
-
-
-\---
-
-
-
-\## IPC Electron — API exposée au renderer
-
-
+## 5. IPC Electron — API exposee au renderer
 
 ```mermaid
-
 flowchart LR
+    subgraph RENDERER["Renderer window.modInspector"]
+        R1["pickModFile()"]
+        R2["pickModFolder()"]
+        R3["inspectModFile(filePath)"]
+        R4["planMigration(inspection, target)"]
+        R5["convertArtifact(inspection, target)"]
+        R6["createMigrationWorkspace(inspection, plan)"]
+        R7["prepareDecompilation(workspace)"]
+        R8["applyAutomaticPatches(workspace)"]
+        R9["runStageBuild(workspace, stagePath)"]
+        R10["runWorkspaceBuilds(workspace)"]
+        R11["runWorkspaceScript(scriptPath)"]
+        R12["runBenchmark(folderPath, target, options)"]
+        R13["openPath(targetPath)"]
+        R14["windowAction(action)"]
+    end
 
-&#x20;   subgraph RENDERER\["Renderer (window.modInspector)"]
+    subgraph MAIN["Main Process ipcMain"]
+        M1["dialog.showOpenDialog file"]
+        M2["dialog.showOpenDialog folder"]
+        M3["inspectArtifact()"]
+        M4["planMigration()"]
+        M5["convertArtifact()"]
+        M6["createMigrationWorkspace()"]
+        M7["prepareDecompilation()"]
+        M8["applyAutomaticPatches()"]
+        M9["runSingleStageBuild()"]
+        M10["runWorkspaceBuilds()"]
+        M11["powershell -File scriptPath"]
+        M12["runBenchmark()"]
+        M13["shell.openPath()"]
+        M14["BrowserWindow actions"]
+    end
 
-&#x20;       R1\["pickModFile()"]
-
-&#x20;       R2\["pickModFolder()"]
-
-&#x20;       R3\["inspectModFile(filePath)"]
-
-&#x20;       R4\["planMigration(inspection, target)"]
-
-&#x20;       R5\["convertArtifact(inspection, target)"]
-
-&#x20;       R6\["createMigrationWorkspace(inspection, plan)"]
-
-&#x20;       R7\["prepareDecompilation(workspace)"]
-
-&#x20;       R8\["applyAutomaticPatches(workspace)"]
-
-&#x20;       R9\["runStageBuild(workspace, stagePath)"]
-
-&#x20;       R10\["runWorkspaceBuilds(workspace)"]
-
-&#x20;       R11\["runWorkspaceScript(scriptPath)"]
-
-&#x20;       R12\["runBenchmark(folderPath, target, options)"]
-
-&#x20;       R13\["openPath(targetPath)"]
-
-&#x20;       R14\["windowAction(action)"]
-
-&#x20;   end
-
-
-
-&#x20;   subgraph MAIN\["Main Process (ipcMain)"]
-
-&#x20;       M1\["dialog.showOpenDialog (file)"]
-
-&#x20;       M2\["dialog.showOpenDialog (folder)"]
-
-&#x20;       M3\["inspectArtifact()"]
-
-&#x20;       M4\["planMigration()"]
-
-&#x20;       M5\["convertArtifact()"]
-
-&#x20;       M6\["createMigrationWorkspace()"]
-
-&#x20;       M7\["prepareDecompilation()"]
-
-&#x20;       M8\["applyAutomaticPatches()"]
-
-&#x20;       M9\["runSingleStageBuild()"]
-
-&#x20;       M10\["runWorkspaceBuilds()"]
-
-&#x20;       M11\["powershell -File scriptPath"]
-
-&#x20;       M12\["runBenchmark()"]
-
-&#x20;       M13\["shell.openPath()"]
-
-&#x20;       M14\["BrowserWindow actions"]
-
-&#x20;   end
-
-
-
-&#x20;   R1 -->|IPC| M1
-
-&#x20;   R2 -->|IPC| M2
-
-&#x20;   R3 -->|IPC| M3
-
-&#x20;   R4 -->|IPC| M4
-
-&#x20;   R5 -->|IPC| M5
-
-&#x20;   R6 -->|IPC| M6
-
-&#x20;   R7 -->|IPC| M7
-
-&#x20;   R8 -->|IPC| M8
-
-&#x20;   R9 -->|IPC| M9
-
-&#x20;   R10 -->|IPC| M10
-
-&#x20;   R11 -->|IPC| M11
-
-&#x20;   R12 -->|IPC| M12
-
-&#x20;   R13 -->|IPC| M13
-
-&#x20;   R14 -->|IPC| M14
-
+    R1 -->|IPC| M1
+    R2 -->|IPC| M2
+    R3 -->|IPC| M3
+    R4 -->|IPC| M4
+    R5 -->|IPC| M5
+    R6 -->|IPC| M6
+    R7 -->|IPC| M7
+    R8 -->|IPC| M8
+    R9 -->|IPC| M9
+    R10 -->|IPC| M10
+    R11 -->|IPC| M11
+    R12 -->|IPC| M12
+    R13 -->|IPC| M13
+    R14 -->|IPC| M14
 ```
 
-
-
-\---
-
-
-
-\## Structure des fichiers générés par stage
-
-
+## 6. Structure des fichiers generes par stage
 
 ```mermaid
-
 flowchart TD
+    ROOT["workspace-root/"]
 
-&#x20;   ROOT\["workspace-root/"]
+    ROOT --> GLOBAL_SCRIPTS["init-workspace.ps1 / build-workspace.ps1 / workspace-guide.md / README.md / checklist.md"]
+    ROOT --> TOOLS["tools/cfr/cfr-0.152.jar"]
+    ROOT --> DECOMPILED["decompiled-sources/ .java CFR output"]
+    ROOT --> S1["stage-1/ palier source"]
+    ROOT --> SN["stage-N/ palier cible final"]
 
-
-
-&#x20;   ROOT --> GLOBAL\_SCRIPTS\["init-workspace.ps1\\nbuild-workspace.ps1\\nworkspace-guide.md\\nREADME.md\\nchecklist.md"]
-
-&#x20;   ROOT --> TOOLS\["tools/cfr/\\ncfr-0.152.jar"]
-
-&#x20;   ROOT --> DECOMPILED\["decompiled-sources/\\n\*.java (CFR output)"]
-
-
-
-&#x20;   ROOT --> S1\["stage-1/\\n(palier source)"]
-
-&#x20;   ROOT --> SN\["stage-N/\\n(palier cible final)"]
-
-
-
-&#x20;   S1 --> SRC\_DIR\["src/\\n  main/java/\\n  main/resources/\\n  imported/java/\\n  imported/resources/"]
-
-&#x20;   S1 --> BUILD\_FILES\["build.gradle\\nsettings.gradle\\ngradle.properties\\n.gitignore"]
-
-&#x20;   S1 --> METADATA\["mods.toml\\nfabric.mod.json\\nquilt.mod.json\\nplugin.yml"]
-
-&#x20;   S1 --> PROFILES\["toolchain-profile.json\\nmapping-profile.json"]
-
-&#x20;   S1 --> STAGE\_SCRIPTS\["scripts/\\n  init-stage.ps1\\n  build-stage.ps1\\n  decompile.ps1\\ntoolchain-guide.md"]
-
-&#x20;   S1 --> NOTES\["notes/\\n  build-diagnostic.json\\n  build-result.json\\n  build-output.log\\n  decompiled-import.json\\n  patch-report.md"]
-
+    S1 --> SRC_DIR["src/main/java / src/main/resources / src/imported/java / src/imported/resources"]
+    S1 --> BUILD_FILES["build.gradle / settings.gradle / gradle.properties / .gitignore"]
+    S1 --> METADATA["mods.toml / fabric.mod.json / quilt.mod.json / plugin.yml"]
+    S1 --> PROFILES["toolchain-profile.json / mapping-profile.json"]
+    S1 --> STAGE_SCRIPTS["scripts/init-stage.ps1 / build-stage.ps1 / decompile.ps1 / toolchain-guide.md"]
+    S1 --> NOTES["notes/build-diagnostic.json / build-result.json / build-output.log / decompiled-import.json / patch-report.md"]
 ```
-
